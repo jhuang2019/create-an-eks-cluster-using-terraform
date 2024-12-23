@@ -57,3 +57,27 @@ variable "public_subnet_2b_az" {
   type = string
   default = "ap-southeast-2b" 
 }
+
+variable "eks_master_role" {
+  description = "The name of the EKS cluster master role"  
+  type = string
+  default = "eks-cluster-master-role" 
+}
+
+variable "eks_node_group_role" {
+  description = "The name of the EKS node group role"  
+  type = string
+  default = "eks-node-group-role" 
+}
+
+variable "cluster_name" {
+  description = "The name of the EKS cluster" 
+  type= string
+  default="eks-demo"
+}
+
+variable "node_group_name" {
+  description = "The name of the EKS node group" 
+  type= string
+  default="eks-node-group-on-demand"
+}
