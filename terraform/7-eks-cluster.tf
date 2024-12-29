@@ -14,3 +14,11 @@ resource "aws_eks_cluster" "eks_demo" {
 
   depends_on = [aws_iam_role_policy_attachment.eks_AmazonEKSClusterPolicy]
 }
+
+resource "null_resource" "update_eks_kubectl" {
+  provisioner "local-exec" {
+        command = "mv  ~/.kube/config  ~/.kube/config.bak ; mv ~/.config/argocd/config  ~/.config/argocd/config.bak; aws eks --region ${var.region} update-kubeconfig --name ${var.cluster_name}"
+    }
+
+  depends_on = [aws_eks_cluster.eks_demo]
+}
