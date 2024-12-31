@@ -17,6 +17,10 @@ resource "aws_eks_node_group" "private_nodes" {
     role = "general"
   }
 
+  remote_access {
+    ec2_ssh_key = "eks_public_key"
+  }
+
   scaling_config {
     desired_size = 1
     max_size = 2

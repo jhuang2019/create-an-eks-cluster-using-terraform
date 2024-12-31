@@ -12,7 +12,10 @@ resource "aws_eks_cluster" "eks_demo" {
     ]
   }  
 
-  depends_on = [aws_iam_role_policy_attachment.eks_AmazonEKSClusterPolicy]
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_AmazonEKSClusterPolicy,
+    aws_iam_role_policy_attachment.eks_AmazonEKSVPCResourceController,
+  ]
 }
 
 resource "null_resource" "update_eks_kubectl" {
