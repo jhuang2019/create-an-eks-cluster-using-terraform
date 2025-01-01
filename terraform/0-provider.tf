@@ -13,6 +13,11 @@ provider "kubernetes" {
   token = data.aws_eks_cluster_auth.cluster.token
 }
 
+provider "helm" {
+  kubernetes {
+    config_path = "~/.kube/config"
+  }
+}
 
 provider "kubectl" {
   # Configuration options

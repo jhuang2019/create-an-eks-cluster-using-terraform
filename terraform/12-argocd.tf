@@ -23,7 +23,7 @@ resource "null_resource" "create_lb"{
 }
 
 resource "time_sleep" "wait_300_seconds" {
-  create_duration = "300s"
+  create_duration = "240s"
 
   depends_on = [null_resource.create_lb]
 }
