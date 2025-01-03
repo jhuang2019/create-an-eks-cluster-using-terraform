@@ -11,6 +11,7 @@ project_name="default"
 git_repo="https://github.com/jhuang2019/gitops-apps"
 git_path="./simple-app"
 dest_namespace="gitops-demo-2"
+sync_policy="auto"
 
 echo "Add the EKS cluster which was created by Terraform to ArgoCD"
 argocd cluster add --yes  $CONTEXT_NAME
@@ -22,6 +23,7 @@ echo "Git repo is $git_repo"
 echo "Git path is $git_path"
 echo "K8S cluster is $k8s_cluster"
 echo "Dest namespace is $dest_namespace"
+echo "Sync policy is $sync_policy"
 
 echo "Create a namespace called $dest_namespace"
 kubectl create namespace $dest_namespace
@@ -31,11 +33,12 @@ argocd app create $app_name \
 --project $project_name \
 --repo $git_repo \
 --path $git_path \
+--sync-policy $sync_policy \
 --dest-server $k8s_cluster \
 --dest-namespace $dest_namespace \
 
 echo "Retrieve the ArgoCD application list again"
 argocd app list
 
-echo "Sync the ArgoCD application"
-argocd app sync $app_name
+# echo "Sync the ArgoCD application"
+# argocd app sync $app_name
