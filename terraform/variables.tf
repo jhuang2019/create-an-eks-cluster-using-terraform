@@ -81,3 +81,9 @@ variable "node_group_name" {
   type= string
   default="eks-node-group-on-demand"
 }
+
+variable "ecr_repo_name" {
+  description = "The name of the ECR repo"
+  type        = string
+  default = "jen/my-nginx"
+}
