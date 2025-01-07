@@ -62,6 +62,6 @@ resource "aws_iam_role_policy_attachment" "eks_cluster_autoscaler_attach" {
   policy_arn = aws_iam_policy.eks_cluster_autoscaler.arn
 }
 
-output "eks_cluster_autoscaler_arn" {
-  value = aws_iam_role.eks_cluster_autoscaler.arn
-}
+# output "eks_cluster_autoscaler_arn" {
+#   value = aws_iam_role.eks_cluster_autoscaler.arn
+# }

@@ -3,7 +3,7 @@ resource "tls_private_key" "eks_bastion_key" {
   rsa_bits  = 4096
 }
 
-# Save Private key locally
+# Save the private key locally
 resource "local_file" "eks_bastion_private_key" {
   depends_on = [
     tls_private_key.eks_bastion_key,
@@ -12,7 +12,7 @@ resource "local_file" "eks_bastion_private_key" {
   filename = "eks.pem"
 }
 
-# Upload public key to create keypair on AWS
+# Upload the public key to create a keypair on AWS
 resource "aws_key_pair" "eks_public_key" {
   depends_on = [
     tls_private_key.eks_bastion_key,
@@ -20,7 +20,6 @@ resource "aws_key_pair" "eks_public_key" {
   key_name   = "eks_public_key"
   public_key = tls_private_key.eks_bastion_key.public_key_openssh
 }
-
 
 resource "null_resource" "chmod_pem_key" {
   depends_on =[aws_key_pair.eks_public_key]
