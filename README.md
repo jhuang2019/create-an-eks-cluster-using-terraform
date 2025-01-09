@@ -14,6 +14,11 @@ The entire lifecyle is achieved by a fully automated CI/CD process.
 * Terraform
 * GitHub Actions
 
+## The repos involved
+
+* The [application repo](https://github.com/jhuang2019/my-nginx) which includes `Dockerfile`
+* The [GitOps repo](https://github.com/jhuang2019/gitops-apps/tree/main/simple-app) which includes Kubernetes manifests
+* This [infrascture code repo](https://github.com/jhuang2019/create-an-eks-cluster-using-terraform) which includes Terraform code
 
 ## The architecture diagram
 
@@ -155,7 +160,8 @@ Below is an outline of the project directory
   * `13-key.tf`: It is used to create a private key which will be used in the EKS worker nodes.
   * `14-bastion-host.tf`: It is used to created a bastion host which can acess the EKS worker worker nodes that are in private subnets.
   * `15-eks-autoscaler.tf`: It is used to deploy the cluster-autoscaler to the namespace `kube-system` in the EKS cluster.
-  * `16-iam-oidc-github.tf`: It is used to create an IAM role which is required to retrieve the AWS ECR credentials in the GitHub actions.
+  * `16-iam-oidc-github.tf`: It is used to create an IAM role which is required to retrieve the AWS ECR credentials in the GitHub actions. The repo `jhuang2019/my-nginx:*` is the application repo which includes the `Dockerfile`. 
+    * ![Alt text](./images/iam-role-github.png)
   * `17-ecr.tf`: It is used to create a private repo in the Amazon ECR.
   * `variables.tf`: It keeps variables.
   * `outputs.tf`: It keeps output values.
@@ -191,6 +197,11 @@ It takes around 15-20 mins to bootstrap all resources.
 
 ![Alt text](./images/terraform-apply-after.png)
 
+* The output values are used in different repos.
+  * The output `eks_cluster_autosclaer_arn`: Copy this value and add it to `eks.amazonaws.com/role-arn` in `k8s/cluster-autoscaler.yaml`
+  * The output `github_actions_arn`: Save this value as it will be used in the Github Actions workflow later.
+  * The output `test_policy_arn`: Copth this value and add it to `eks.amazonaws.com/role-arn` in `k8s/aws-test.yaml`
+
 #### Own VPC for the EKS cluster is created
 
 ![Alt text](./images/vpc.png)
@@ -221,7 +232,7 @@ It shows that the pod `my-nginx`  has been deployed in the namespace `gitops-dem
 
 ![Alt text](./images/kubectl-result.png)
 
-### Step 5: Setting Up GitHub Actions
+### Step 5: Setting Up GitHub Actions (This is for the CI process)
 
 In this step, we will configure GitHub Actions to automate the building and pushing of our Docker image to AWS Elastic Container Registry (ECR). The entire workflow is defined in a YAML file located at the application repo.
 The file path is https://github.com/jhuang2019/my-nginx/blob/main/.github/workflows/main.yml
@@ -236,11 +247,11 @@ The file path is https://github.com/jhuang2019/my-nginx/blob/main/.github/workfl
 
 * Update `role-to-assume` in the GitHub Actions workflow file `main.yml`
 
-This can be found in the output value `github_acions_arn` from the `terraform apply`
+This can be found in the output value `github_acions_arn` from the `terraform apply` result.
 
 ![Alt text](./images/terraform-apply-after.png)
 
-* Run the workflow `main.yaml` which implements the following steps.
+* Run the workflow `main.yaml` which implements the following steps. This worklow also can be triggered by an auto commit to the main branch of the application repo.
 
   * Checkout the applicatio repo which includes `Dockerfile`
   * Setup AWS ECR Details using `role-to-assume` and `aws_region` which are mentioned above
@@ -258,6 +269,45 @@ The image tag from `github.sha` is displayed in the logs.
 
 ![Alt text](./images/gh-action-frist-tag.png)
 
+### Step 6: Verifying the CD process
+
+* The first successful deployment
+
+The deployment is successful in Argo CD.
+
+![Alt text](./images/argo-successful-deployment-1.png)
+
+The image tag is from the `github.sha` which is defined in the CI workflow.
+
+![Alt text](./images/argo-first-image-tag.png)
+
+View the web page via the DNS of the load balancer
+
+![Alt text](./images/first-deployment-result.png)
+
+* New code change in the application repo
+
+A developer updated `index.html` and commited a code change in the application repo
+
+![Alt text](./images/manully-update-index-html.png)
+
+A new build is automatically trigged to build a new image with another new image tag `8exxxxxxxxx`.
+
+![Alt text](./images/gh-second-run-result.png)
+
+* The second successful deployment
+  
+The deployment is successful again in Argo CD. Please note not all details of the commit message is displayed in Argo CD.
+
+![Alt text](./images/argo-successful-deployment-2.png)
+
+The image tag has been changed this time and is consistent with the second image tag from the CI job.
+
+![Alt text](./images/argo-second-image-tag.png)
+
+View the web page again via the DNS of the load balancer and can confirm that the content got updated.
+
+![Alt text](./images/second-deployment-result.png)
 
 ### Cleanup resources
 
