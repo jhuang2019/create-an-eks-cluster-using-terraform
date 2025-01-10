@@ -43,12 +43,13 @@ The entire lifecyle is achieved by a fully automated CI/CD process.
   * User Name: `Administrator`
   * Custom password: Create your own password
   * Attach policies directly with the policy name called `AdministratorAccess`
+* Install AWS CLI
 * A locally configured AWS profile for the above IAM user `Administrator`
 * All the AWS resources mentioined above are created in the IAM user account `Administrator`
 * Install Terraform
-* Install AWS CLI
 * Install colima to run docker as I'm on Mac (m2 chip)
 * Install kubectl
+* Install helm
 * Install argocd CLI
 * Install jq
 
@@ -238,7 +239,7 @@ In this step, we will configure GitHub Actions to automate the building and push
 The file path is https://github.com/jhuang2019/my-nginx/blob/main/.github/workflows/main.yml
 
 * Add Credentials as GitHub Secrets: Navigate to your GitHub repository, go to Settings > Secrets and variables > Actions, and add the following secrets:
-  * AWS_ECR_REPO: This can be found in the ECR via the Terraform console after it is created by Terraform. It also can be found in `variables.tf` in the Terraform code.
+  * AWS_ECR_REPO: This can be found in the ECR via the AWS console after it is created by Terraform. It also can be found in `variables.tf` in the Terraform code.
   * AWS_REGION:  This is the aws_region where the EKS cluster is deployed to. This can be found in `variables.tf` in the Terraform code.
   * REPO_TOKEN : This is my personal GitHub token
 
@@ -309,7 +310,7 @@ View the web page again via the DNS of the load balancer and can confirm that th
 
 ![Alt text](./images/second-deployment-result.png)
 
-### Cleanup resources
+## Cleanup resources
 
 This needs to be improved in future. Currently, some manual steps below are required before running `terraform destroy`.
 
@@ -326,9 +327,38 @@ Please note one resource `argocd` has been manually deleted via kubectl commands
 
 ![Alt text](./images/terraform-destroy.png)
 
+## What can be improved in future
+
+* The DNS of the web application is not secure, so an SSL certificate from ACM should be added.
+* To look for a better way to make the first deployment successful automatically. The current implementation is to add a dummy image tag to `Deployment.yml`, so the first deployment is expected to fail. 
+* To look for the best strategy to tag a new docker image. The current implementation is to use `github.sha` as the new docker image.
+* To create a new GitHub action workflow to achieve the CD process. The current implemetation is to create a shell script that contains the Argo CD CLI which creates a new Argo application, and the shell script is invoked when ArgoCD is created by Terraform.
+* To re-structure the code and bootstrap the infrastructure by follow the order of vpc --> eks --> argocd. A good reference is [here](https://fewmorewords.com/eks-with-argocd-using-terraform).
+* To improve the web application. It just contains a very simple `index.html` now.
+
 ## Issues I had and how I fixed them
 
-### Issue 1: I got an error `exec /docker-entrypoint.sh: exec format error` when deploying my docker image to Amazon EKS.
+### Issue 1: The load balancer for the web application was not created
+
+I checked the status of the service via the command `kuectl describe service <service name>` and observed that the error says is “could not find any suitable subnets for creating the ELB”. The root cause is the tags in the VPC subnets were not defined. 
+
+How I fixed the issue was to add the following tags to both public subnets in my VPC by following [this page](https://victoryeo-62924.medium.com/external-ip-pending-problem-in-aws-eks-7f2df180da54).
+
+```terraform
+  tags = {
+    "kubernetes.io/role/elb" = "1"
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+  } 
+
+```
+
+### Issue 2: Got an error when creating Argo CD from helm
+
+The error is  unable to build kubernetes objects from release manifest: resource mapping not found for name: "cluster-autoscaler-aws-cluster-autoscaler" namespace: "" from "": no matches for kind "PodDisruptionBudget" in version "policy/v1beta1".
+
+How I fixed the issue was to remove `version= "9.9.2"` from the 15-eks-autoscaler.tf.
+
+### Issue 3: Got an error `exec /docker-entrypoint.sh: exec format error` when deploying my docker image to Amazon EKS.
 
 The root cause is that the image I genereated on my Mac with M2 chip is not compatible with Amazon EKS.
 
@@ -348,6 +378,58 @@ FROM --platform=linux/amd64 nginx:latest
 
 ```
 
-### Issue 2: 
+### Issue 4: Got a warning `Your docker password is not masked` when running the GitHub action workflow `main.yml`
+
+The details of the warning can be found [here](https://github.com/aws-actions/amazon-ecr-login#docker-credentials).
+
+How I fixed the issue was to bump `aws-actions/amazon-ecr-login` from `v1` to `v2` according to [this page](https://github.com/aws-actions/amazon-ecr-login/issues/526).
+
+### Issue 5: Got an error `Credentials could not be loaded, please check your action inputs: Could not load credentials from any providers` when running the GitHub action workflow `main.yml`
+
+How I fixed the issue was to add the following code to `main.yml` before starting a job according to [this page](https://stackoverflow.com/questions/77227676/github-action-configure-aws-credentials-could-not-load-credentials-from-any-pr).
+
+```githun actions
+permissions:
+      id-token: write   # This is required for requesting the JWT
+      contents: read 
+
+```
+
+### Issue 6: Not able to pass a masked value (ECR_REGISTRY) from job A to job B
+
+The [GitHub page](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions) specifically says "after you mask a value, you won't be able to set that value as an output". I ended up using one job before a better approach is implemented.
+
+### Issue 7: Not able to use `github.run_number` as a new docker image tag
+
+If 80 appears multiple times in `deployment.yml` and the `github.run_number` is 80, when I was trying to replace the new image tag with `80`, I accidentally replaced all `80`s in `deployment.yml` which is not expeted. I haven't found a better way to fix this defect in my code yet, so I ended up using `github.sha` as the new docker image tag.
 
 ## References
+
+* <https://antonputra.com/terraform/how-to-create-eks-cluster-using-terraform/#eks-cluster-auto-scaling-demo>
+* <https://github.com/xiongye77/eks-demo>
+* <https://victoryeo-62924.medium.com/external-ip-pending-problem-in-aws-eks-7f2df180da54>
+* <https://codefresh.io/learn/argo-cd/argo-cd-on-eks/>
+* <https://medium.com/@chauhanhimani512/install-argocd-on-the-eks-cluster-and-configure-sync-with-the-github-manifest-repository-9e3d62e1c093>
+* <https://collabnix.com/deploying-argocd-with-aws-eks/>
+* <https://apexlemons.com/devops/argocd-on-minikube-on-macos-apple-silicon-version-m1-m2/>
+* <https://blog.nashtechglobal.com/deploying-argocd-on-kubernetes-with-terraform/>
+* <https://readmedium.com/en/https:/betterprogramming.pub/how-to-set-up-argo-cd-with-terraform-to-implement-pure-gitops-d5a1d797926a>
+* <https://piotrminkowski.com/2022/06/28/manage-kubernetes-cluster-with-terraform-and-argo-cd/>
+* <https://blog.saintmalik.me/argocd-on-kubernetes-cluster/>
+* <https://spacelift.io/blog/argocd-terraform>
+* <https://fewmorewords.com/eks-with-argocd-using-terraform>
+* <https://gokuldevops.medium.com/argo-cdsample-app-deployment-56b36601f279>
+* <https://medium.com/@dinnyuylemnyuy/deploying-a-dockerized-application-to-aws-eks-using-argocd-github-actions-and-terraform-dad794dd1358>
+* <https://community.aws/content/2owpkcMiX4bBoidvHcXhVXiAAIJ/effortless-aws-eks-cluster-autoscaling-using-terraform?lang=en>
+* <https://rynaardb.com/posts/implementing-auto-scaling-for-aws-eks/>
+* <https://gartsolutions.medium.com/building-an-effective-ci-cd-pipeline-a-comprehensive-guide-bb07343973b7>
+* <https://medium.com/@disha.20.10/unpacking-gitops-part-2-automating-docker-image-deployment-with-github-actions-b8156297c7e0>
+* <https://medium.com/@anshita.bhasin/build-and-push-docker-image-to-aws-ecr-using-github-actions-506e9f77f7f8>
+* <https://towardsaws.com/build-push-docker-image-to-aws-ecr-using-github-actions-8396888a8f9e>
+* <https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions>
+* <https://github.com/orgs/community/discussions/25225#discussioncomment-6776295>
+* <https://github.com/dishavirk/GitOps-with-EKS-ArgoCD-TF/blob/master/.github/workflows/build_push_update.yaml>
+* <https://stackoverflow.com/questions/64374179/how-to-push-to-another-repository-in-github-actions>
+* <https://aws.amazon.com/blogs/security/use-iam-roles-to-connect-github-actions-to-actions-in-aws/>
+* <https://faun.pub/configure-aws-credentials-for-github-actions-with-assume-role-14a21926c1f6>
+* <https://stackoverflow.com/questions/77227676/github-action-configure-aws-credentials-could-not-load-credentials-from-any-pr>
