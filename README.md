@@ -314,9 +314,9 @@ View the web page again via the DNS of the load balancer and can confirm that th
 
 This needs to be improved in future. Currently, some manual steps below are required before running `terraform destroy`.
 
-* Manually delete the argo app in the argocd UI.
-* Manually run `kubectl delete ns argocd` so that `terraform destroy` wont get stuck in destroying the eks worker nodes.
-* Manully remove all images in the ECR repo. Otherwise it wont allow the ecr repo to be deleted by Terraform.
+* Manually delete the Argo application in the argocd UI so that `terraform destroy` won't get stuck in destroying the eks worker nodes. The reason being that the Argo application was created by the shell script instead of Terraform.
+* Manually run `kubectl delete ns argocd`. This is probably optional as the namesapce `argocd` is created by Terraform.
+* Manully remove all images in the ECR repo. Otherwise it won't allow the ecr repo to be deleted by Terraform.
 
 ```terraform
  terraform destroy
